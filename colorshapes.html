@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Colorful Shapes</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            display: none;
+            margin-top: 20px;
+        }
+        .shape {
+            width: 100px;
+            height: 100px;
+            display: inline-block;
+            margin: 20px;
+            cursor: pointer;
+            position: relative;
+	
+        }
+        .circle {
+            border-radius: 50%;
+        }
+        .square {
+            /* no border-radius → square by default */
+        }
+        .triangle {
+            width: 0;
+            height: 0;
+            border-left: 50px solid transparent;
+            border-right: 50px solid transparent;
+            border-bottom: 100px solid;
+            background: none;
+        }
+        .heart {
+            width: 70px;
+            height: 63px;
+            background-color: currentColor;
+            position: relative;
+            transform: rotate(-45deg);
+        }
+        .heart::before,
+        .heart::after {
+            content: "";
+            width: 70px;
+            height: 63px;
+            background-color: currentColor;
+            position: absolute;
+            border-radius: 50%;
+        }
+        .heart::before {
+            top: -35px;
+            left: 0;
+        }
+        .heart::after {
+            left: 35px;
+            top: 0;
+        }
+        #message {
+            margin-top: 20px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        #score {
+            margin-top: 10px;
+            font-size: 20px;
+        }
+        #restart-btn, #start-btn {
+            margin-top: 20px;
+            padding: 15px 30px;
+            font-size: 20px;
+        }
+        .pulse {
+            animation: pulse 0.6s infinite alternate;
+        }
+        @keyframes pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.3); }
+        }
+    </style>
+</head>
+<body>
+    <h1>Colorful Shapes</h1>
+    <p id="instructions">Click "Start" to begin. Tap the correct shape as instructed!</p>
+    <button id="start-btn">Start</button>
+
+    <div id="game-container">
+        <div>
+            <div class="shape" id="shape1"></div>
+            <div class="shape" id="shape2"></div>
+        </div>
+        <div>
+            <div class="shape" id="shape3"></div>
+            <div class="shape" id="shape4"></div>
+        </div>
+        <div id="message"></div>
+        <div id="score">Score: 0</div>
+    </div>
+
+    <button id="restart-btn" style="display:none;">Restart</button>
+
+    <audio id="bg-music" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" loop></audio>
+    <audio id="hit-sound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+    <audio id="gameover-sound" src="https://www.soundjay.com/misc/fail-buzzer-01.mp3"></audio>
+
+    <script>
+        const shapes = document.querySelectorAll('.shape');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const instructions = document.getElementById('instructions');
+        const gameContainer = document.getElementById('game-container');
+        const message = document.getElementById('message');
+        const scoreDisplay = document.getElementById('score');
+
+        const bgMusic = document.getElementById('bg-music');
+        const hitSound = document.getElementById('hit-sound');
+        const gameoverSound = document.getElementById('gameover-sound');
+
+        bgMusic.volume = 0.1;
+        hitSound.volume = 1.0;
+        gameoverSound.volume = 1.0;
+
+        const colors = ['Black', 'Blue', 'Green', 'Yellow', 'Red', 'Pink', 'Brown'];
+        const shapeTypes = ['circle', 'square', 'triangle', 'heart'];
+        let targetColor = '';
+        let targetShape = '';
+        let score = 0;
+        let gameOver = false;
+        let correctClicksNeeded = 0;
+        let speakInterval;
+
+        function getRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function getRandomMessage() {
+            const msgs = ['Well done!', 'Excellent!', 'Good job!', 'Perfect!'];
+            return getRandom(msgs);
+        }
+
+        function speak(text, volume = 1.3, rate = 0.5) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.volume = volume;
+            utterance.rate = rate;
+            utterance.pitch = 0.5;
+            speechSynthesis.speak(utterance);
+        }
+
+        function startSpeaking(text) {
+            clearInterval(speakInterval);
+            speak(text);
+            speakInterval = setInterval(() => {
+                speak(text);
+            }, 1000);
+        }
+
+        function stopSpeaking() {
+            clearInterval(speakInterval);
+            speechSynthesis.cancel();
+        }
+
+        function startGame() {
+            score = 0;
+            gameOver = false;
+            scoreDisplay.textContent = 'Score: 0';
+            startBtn.style.display = 'none';
+            restartBtn.style.display = 'none';
+            instructions.style.display = 'none';
+            message.textContent = '';
+            gameContainer.style.display = 'block';
+            bgMusic.play();
+            spawnShapes();
+        }
+
+        function spawnShapes() {
+            setTimeout(() => {
+                targetColor = getRandom(colors);
+                targetShape = getRandom(shapeTypes);
+                const commandText = `Hey! Tap the ${targetColor} ${targetShape}, please`;
+                message.textContent = commandText;
+                startSpeaking(commandText);
+
+                correctClicksNeeded = 0;
+                shapes.forEach(shape => {
+                    const color = getRandom(colors);
+                    const type = getRandom(shapeTypes);
+                    shape.dataset.color = color;
+                    shape.dataset.shape = type;
+                    shape.className = `shape ${type}`;
+                    shape.style.backgroundColor = (type === 'triangle') ? 'transparent' : color.toLowerCase();
+                    shape.style.borderBottomColor = (type === 'triangle') ? color.toLowerCase() : '';
+                    shape.style.color = (type === 'heart') ? color.toLowerCase() : '';
+                    if (color === targetColor && type === targetShape) correctClicksNeeded++;
+                });
+
+                if (correctClicksNeeded === 0) {
+                    const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
+                    randomShape.dataset.color = targetColor;
+                    randomShape.dataset.shape = targetShape;
+                    randomShape.className = `shape ${targetShape}`;
+                    randomShape.style.backgroundColor = (targetShape === 'triangle') ? 'transparent' : targetColor.toLowerCase();
+                    randomShape.style.borderBottomColor = (targetShape === 'triangle') ? targetColor.toLowerCase() : '';
+                    randomShape.style.color = (targetShape === 'heart') ? targetColor.toLowerCase() : '';
+                    correctClicksNeeded = 1;
+                }
+            }, 1000);
+        }
+
+        function handleClick(e) {
+            if (gameOver) return;
+            const shape = e.currentTarget;
+            const color = shape.dataset.color;
+            const type = shape.dataset.shape;
+            if (!color || !type) return;
+
+            if (color === targetColor && type === targetShape) {
+                hitSound.currentTime = 0;
+                hitSound.play();
+                shape.dataset.color = '';
+                shape.dataset.shape = '';
+                shape.className = 'shape';
+                shape.style.backgroundColor = 'transparent';
+                shape.style.borderBottomColor = '';
+                shape.style.color = '';
+                score++;
+                scoreDisplay.textContent = `Score: ${score}`;
+                correctClicksNeeded--;
+                if (correctClicksNeeded === 0) {
+                    stopSpeaking();
+                    const successMsg = getRandomMessage();
+                    message.textContent = successMsg;
+                    speak(successMsg, 1.0, 0.5);
+                    setTimeout(() => {
+                        spawnShapes();
+                    }, 1000);
+                }
+            } else {
+                const wrongText = `This is ${color} ${type}`;
+                message.textContent = wrongText;
+                speak(wrongText, 1.0, 0.6);
+                shapes.forEach(s => {
+                    if (s.dataset.color === targetColor && s.dataset.shape === targetShape) {
+                        s.classList.add('pulse');
+                    } else {
+                        s.classList.remove('pulse');
+                    }
+                });
+                endGame();
+            }
+        }
+
+        function endGame() {
+            gameOver = true;
+            stopSpeaking();
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+            gameoverSound.play();
+            restartBtn.style.display = 'inline-block';
+        }
+
+        shapes.forEach(shape => {
+            shape.addEventListener('click', handleClick);
+        });
+
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', () => {
+            shapes.forEach(shape => {
+                shape.className = 'shape';
+                shape.style.backgroundColor = 'transparent';
+                shape.style.borderBottomColor = '';
+                shape.style.color = '';
+                shape.classList.remove('pulse');
+            });
+            bgMusic.currentTime = 0;
+            startGame();
+        });
+    </script>
+</body>
+</html>
